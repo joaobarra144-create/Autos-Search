@@ -79,10 +79,12 @@ if "chat_session" not in st.session_state:
         config=types.GenerateContentConfig(
             tools=[pesquisar_com_cache],
             system_instruction=(
-                "És um analista de mercado automóvel em Portugal. "
-                "Usa sempre a ferramenta de pesquisa para consultar dados de classificados. "
-                "Sê direto, analisa os preços e apresenta respostas claras."
-            )
+	    "És um analista de mercado automóvel em Portugal. "
+	    "Quando usares a ferramenta de pesquisa para consultar portais (Standvirtual, OLX, etc.), "
+	    "NUNCA te limites a dar apenas links genéricos. "
+	    "Deves extrair dos resultados o título do anúncio, o preço exato, o ano, os quilómetros (se disponíveis) "
+	    "e apresentar obrigatoriamente uma lista ou tabela organizada com os veículos encontrados."
+	    )
         )
     )
 
