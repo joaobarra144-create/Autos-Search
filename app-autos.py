@@ -4,6 +4,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 from ddgs import DDGS
+import time
 
 # Configuração da página do Streamlit
 st.set_page_config(
@@ -100,15 +101,27 @@ if prompt := st.chat_input("Ex: Qual o preço médio de um BMW X3 usado de 2008?
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Gerar resposta do agente
+# Gerar resposta do agente com tentativas automáticas para o erro 503
     with st.chat_message("assistant"):
         with st.spinner("A consultar classificados e a pensar..."):
-            try:
-                response = st.session_state.chat_session.send_message(prompt)
-                resposta_texto = response.text
+            max_tentativas = 5
+            sucesso = False
+            resposta_texto = ""
+            
+            for tentativa in range(max_tentativas):
+                try:
+                    response = st.session_state.chat_session.send_message(prompt)
+                    resposta_texto = response.text
+                    sucesso = True
+                    break
+                except ServerError:
+                    time.sleep(3)
+                except Exception as e:
+                    resposta_texto = f"Ocorreu um erro ao comunicar com a API: {str(e)}"
+                    break
+            
+            if sucesso:
                 st.markdown(resposta_texto)
-                # Adicionar resposta ao histórico
                 st.session_state.messages.append({"role": "assistant", "content": resposta_texto})
-            except Exception as e:
-                erro_msg = f"Ocorreu um erro ao comunicar com a API: {str(e)}"
-                st.error(erro_msg)
+            else:
+                st.error("O servidor continua sobrecarregado após várias tentativas. Por favor, tenta novamente mais tarde.")
