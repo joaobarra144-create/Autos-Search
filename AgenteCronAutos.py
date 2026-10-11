@@ -1,5 +1,4 @@
 import os
-import time
 from datetime import datetime
 from google import genai
 from google.genai import types
@@ -16,7 +15,7 @@ def pesquisar_anuncios_recentes(query: str) -> str:
         with DDGS() as ddgs:
             resultados = [
                 f"Título: {r.get('title')}\nResumo: {r.get('body')}\nLink: {r.get('href')}" 
-                for r in ddgs.text(query_otimizada, max_results=5)
+                for r in ddgs.text(query_otimizada, max_results=4)
             ]
             if not resultados:
                 return "Não foram encontrados novos anúncios recentes."
@@ -25,56 +24,37 @@ def pesquisar_anuncios_recentes(query: str) -> str:
         return f"Erro na pesquisa web: {str(e)}"
 
 def main():
-    print(f"\n[Execução GitHub Actions] A iniciar rotina diária às {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\n[Execução GitHub Actions] A iniciar rotina direta às {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     veiculo_alvo = "BMW X3 2008 diesel Portugal"
-    prompt = f"Pesquisa anúncios recentes de {veiculo_alvo}. Extrai os títulos, os preços exatos, o ano e os links dos anúncios encontrados. Apresenta uma lista limpa e organizada."
+    prompt = f"Pesquisa anúncios recentes de {veiculo_alvo}. Extrai os títulos, preços, anos e links encontrados. Apresenta uma lista limpa e organizada."
     
     modelo = 'gemini-3.8-flash'
     
-    max_tentativas = 5
-    sucesso = False
-    relatorio = ""
-
-    for tentativa in range(max_tentativas):
-        try:
-            # Recomendação oficial: Usar Chat para chamadas de ferramentas automáticas
-            chat = client.chats.create(
-                model=modelo,
-                config=types.GenerateContentConfig(
-                    tools=[pesquisar_anuncios_recentes],
-                    system_instruction=(
-                        "És um analista de mercado automóvel autónomo em Portugal. "
-                        "Usa a ferramenta de pesquisa para consultar classificados e apresenta uma lista detalhada "
-                        "com o título, preço, ano e link de cada veículo, sem respostas vagas."
-                    )
-                )
+    try:
+        # Apenas uma única chamada direta sem conversação complexa
+        response = client.models.generate_content(
+            model=modelo,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[pesquisar_anuncios_recentes],
+                system_instruction="És um analista de mercado automóvel em Portugal. Apresenta uma lista limpa com título, preço, ano e link dos veículos encontrados."
             )
-            
-            response = chat.send_message(prompt)
-            relatorio = response.text
-            sucesso = True
-            break
-            
-        except Exception as e:
-            erro_str = str(e)
-            if "503" in erro_str or "UNAVAILABLE" in erro_str:
-                print(f"[Aviso] Servidor sobrecarregado (Tentativa {tentativa+1}/{max_tentativas}). A aguardar 10 segundos...")
-                time.sleep(10)
-            else:
-                print(f"[Erro]: {erro_str}")
-                break
-
-    if sucesso and relatorio:
+        )
+        
+        relatorio = response.text
+        
         nome_ficheiro = "relatorio_diario.md"
         data_hoje = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conteudo_ficheiro = f"# Relatório Automático de Classificados\n*Atualizado em: {data_hoje}*\n\n{relatorio}\n"
         
         with open(nome_ficheiro, "w", encoding="utf-8") as f:
             f.write(conteudo_ficheiro)
+            
         print(f"[Sucesso] Relatório guardado em {nome_ficheiro}")
-    else:
-        print("[Erro] Não foi possível gerar o relatório após várias tentativas devido a indisponibilidade do serviço.")
+        
+    except Exception as e:
+        print(f"[Erro]: {str(e)}")
         exit(1)
 
 if __name__ == "__main__":
