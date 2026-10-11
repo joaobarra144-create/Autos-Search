@@ -1,10 +1,10 @@
 import os
+import time
 from datetime import datetime
 from google import genai
 from google.genai import types
 from ddgs import DDGS
 
-# Inicializar o cliente do Google GenAI
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 def pesquisar_anuncios_recentes(query: str) -> str:
@@ -32,35 +32,49 @@ def main():
     
     modelo = 'gemini-3.8-flash'
     
-    try:
-        # Chamada direta e única (consome muito menos quota da API)
-        response = client.models.generate_content(
-            model=modelo,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[pesquisar_anuncios_recentes],
-                system_instruction=(
-                    "És um analista de mercado automóvel autónomo em Portugal. "
-                    "Usa a ferramenta de pesquisa para consultar classificados e apresenta uma lista detalhada "
-                    "com o título, preço, ano e link de cada veículo, sem respostas vagas."
+    max_tentativas = 5
+    sucesso = False
+    relatorio = ""
+
+    for tentativa in range(max_tentativas):
+        try:
+            # Recomendação oficial: Usar Chat para chamadas de ferramentas automáticas
+            chat = client.chats.create(
+                model=modelo,
+                config=types.GenerateContentConfig(
+                    tools=[pesquisar_anuncios_recentes],
+                    system_instruction=(
+                        "És um analista de mercado automóvel autónomo em Portugal. "
+                        "Usa a ferramenta de pesquisa para consultar classificados e apresenta uma lista detalhada "
+                        "com o título, preço, ano e link de cada veículo, sem respostas vagas."
+                    )
                 )
             )
-        )
-        
-        relatorio = response.text
-        
-        # Guardar o relatório no ficheiro fixo
+            
+            response = chat.send_message(prompt)
+            relatorio = response.text
+            sucesso = True
+            break
+            
+        except Exception as e:
+            erro_str = str(e)
+            if "503" in erro_str or "UNAVAILABLE" in erro_str:
+                print(f"[Aviso] Servidor sobrecarregado (Tentativa {tentativa+1}/{max_tentativas}). A aguardar 10 segundos...")
+                time.sleep(10)
+            else:
+                print(f"[Erro]: {erro_str}")
+                break
+
+    if sucesso and relatorio:
         nome_ficheiro = "relatorio_diario.md"
         data_hoje = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         conteudo_ficheiro = f"# Relatório Automático de Classificados\n*Atualizado em: {data_hoje}*\n\n{relatorio}\n"
         
         with open(nome_ficheiro, "w", encoding="utf-8") as f:
             f.write(conteudo_ficheiro)
-            
         print(f"[Sucesso] Relatório guardado em {nome_ficheiro}")
-        
-    except Exception as e:
-        print(f"[Erro na Execução]: {str(e)}")
+    else:
+        print("[Erro] Não foi possível gerar o relatório após várias tentativas devido a indisponibilidade do serviço.")
         exit(1)
 
 if __name__ == "__main__":
